@@ -1,0 +1,223 @@
+---
+title: "utility_contributions"
+author: "Quinn Muller"
+date: "2026-04-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+# Turn off scientific notation
+options(scipen=999)
+```
+
+
+#load libraries and preliminary data
+```{r}
+#load libraries
+library(tidyverse)
+library(janitor)
+library(lubridate)
+library(dplyr)
+```
+
+
+```{r}
+#load campaign contributions data reported in 2025, 2026
+
+contributions_2026 <- read.csv("data/contributions_2026.csv") %>% clean_names()
+
+#take out dollar signs
+contributions_2026 <- contributions_2026 %>% 
+  mutate(
+    contribution_amount = str_replace_all(transaction_amount, "[$,]", ""),
+    contribution_amount = as.numeric(contribution_amount)
+  )
+
+#take out extra columns
+contributions_2026[ , c("x", "x_1", "x_2", "x_3", "x_4", "x_5", "x_6", "x_7", "x_8", "x_9", "x_10", "x_11", "x_12", "x_13", "x_14", "x_15", "x_16", "x_17", "x_18", "x_19", "x_20", "x_21")] <- list(NULL)
+
+contributions_2026[ , c("x_22", "x_23", "x_24")] <- list(NULL)
+
+contributions_2025 <- read.csv("data/contributions_2025.csv") %>% clean_names()
+
+#take out dollar signs
+contributions_2025 <- contributions_2025 %>% 
+  mutate(
+    contribution_amount = str_replace_all(transaction_amount, "[$,]", ""),
+    contribution_amount = as.numeric(contribution_amount)
+  )
+
+#take out extra columns
+contributions_2025[ , c("x", "x_1")] <- list(NULL)
+
+```
+
+```{r}
+#create one dataset, stack the contributions from 2025 and 2026
+
+#change price per person avg contrib column to dbl
+contributions_2026 <- contributions_2026 %>% 
+  mutate(price_per_person_or_average_contribution = as.numeric(price_per_person_or_average_contribution))
+
+contributions_2025 <- contributions_2025 %>% 
+  mutate(coordinated_in_kind = as.character(coordinated_in_kind))
+
+md_contributions <- contributions_2025 %>% bind_rows(contributions_2026)
+```
+
+```{r}
+#filter by transaction date so it only falls in the times after 2025 sine die to 2026 sine die aka 2025/26 session
+
+md_contributions$transaction_date <- mdy(md_contributions$transaction_date)
+
+md_contributions_202526 <- md_contributions %>% 
+  filter(transaction_date >= as.Date("2025-04-08") & transaction_date <= as.Date("2026-04-13"))
+```
+
+
+#Clean up data
+```{r}
+#add a column that assigns a contributor as beign from one of th ebig four utility companies or distinguish that it is not a utility contribution
+
+md_contributions_202526 <- md_contributions_202526 %>% 
+  mutate(
+    utility_co = case_when(
+        str_detect(contributor_company_name, "Pepco") ~ "Pepco",
+        str_detect(contributor_company_name, "PEPCO") ~ "Pepco",
+        str_detect(contributor_company_name, "PHI PAC") ~ "Pepco",
+        str_detect(contributor_company_name, "BGE") ~ "BGE",
+        str_detect(contributor_company_name, "BG&E") ~ "BGE",
+        str_detect(contributor_company_name, "BALTIMORE GAS") ~ "BGE",
+        str_detect(contributor_company_name, "Baltimore Gas") ~ "BGE",
+        str_detect(contributor_company_name, "Constel") ~ "Constellation",
+        str_detect(contributor_company_name, "Washington Gas") ~ "Washington Gas",
+        str_detect(contributor_company_name, "WASHINGTON GAS") ~ "Washington Gas",
+        str_detect(contributor_company_name, "WGAS LLC") ~ "Washington Gas",
+        .default = "Not Utility"
+      ))
+
+#add a new column that labels utility or not a utility
+md_contributions_202526 <- md_contributions_202526 %>% 
+  mutate(
+    utility_status = case_when(
+        str_detect(contributor_company_name, "Pepco") ~ "Utility",
+        str_detect(contributor_company_name, "PEPCO") ~ "Utility",
+        str_detect(contributor_company_name, "PHI PAC") ~ "Utility",
+        str_detect(contributor_company_name, "BGE") ~ "Utility",
+        str_detect(contributor_company_name, "BG&E") ~ "Utility",
+        str_detect(contributor_company_name, "BALTIMORE GAS") ~ "Utility",
+        str_detect(contributor_company_name, "Baltimore Gas") ~ "Utility",
+        str_detect(contributor_company_name, "Constel") ~ "Utility",
+        str_detect(contributor_company_name, "Washington Gas") ~ "Utility",
+        str_detect(contributor_company_name, "WASHINGTON GAS") ~ "Utility",
+        str_detect(contributor_company_name, "WGAS LLC") ~ "Utility",
+        .default = "Not Utility"
+      ))
+
+
+#make a new dataframe that is just utility contributions from the 2025/26 session
+
+utility_contributions <- md_contributions_202526 %>% 
+  filter(!utility_co == "Not Utility")
+
+```
+
+
+```{r}
+utility_contributions <- utility_contributions %>% 
+  mutate(
+    energy_committee = case_when(
+        str_detect(committee_name, "Carozza, Mary Beth Friends of") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Guyton, Michele for Baltimore County") ~ "Environment and Transportation",
+        str_detect(committee_name, "Harris, Kevin M. Friends of") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Holmes, Marvin E. Jr. Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Korman, Marc Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Long, Jeffrie Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Watson, Ron Friends of") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Boyce, Regina T. Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Brooks, Benjamin Friends of") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Feldman, Brian Citizens For") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Foley, Linda Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Fraser-Hidalgo, (David) For 15") ~ "Environment and Transportation",
+        str_detect(committee_name, "Gallion, Jason Friends of") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Jacobs, Jay Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Kagan, Cheryl Citizens Helping Elect") ~ "Education, Energy and the Environment",
+        str_detect(committee_name, "Morgan, Todd Friends of") ~ "Environment and Transportation",
+        str_detect(committee_name, "Ziegler, Natalie Friends of") ~ "Environment and Transportation",
+        .default = "No"
+      ))
+```
+
+#data analysis time!
+
+```{r}
+utility_contributions_by_committee <- utility_contributions %>% 
+  group_by(energy_committee) %>% 
+  summarise(contributions_received = sum(contribution_amount)) %>% 
+  arrange(desc(contributions_received))
+
+write.csv(utility_contributions_by_committee, file = "data/utility_contributions_by_committee.csv", row.names = TRUE)
+```
+
+
+```{r}
+utility_contributions_by_candidate <- utility_contributions %>% 
+  group_by(committee_name) %>% 
+  summarize(contributions_received = sum(contribution_amount)) %>% 
+  arrange(desc(contributions_received))
+
+write.csv(utility_contributions_by_candidate, file = "data/utility_contributions_by_candidate.csv", row.names = TRUE)
+```
+
+
+```{r}
+mga_utility_contributions <- read.csv("data/mga_utility_contributions.csv") %>% 
+  clean_names() 
+
+mga_utility_contributions_summarized <- mga_utility_contributions %>%  
+  group_by(accepted_contributions) %>% 
+  summarise(count = n())
+
+mga_utility_contributions_summarized <- mga_utility_contributions_summarized %>% 
+  mutate(percent = count/sum(count)*100)
+```
+
+
+```{r}
+mga_utility_contributions_leadership <- mga_utility_contributions %>%
+  filter(!position == "None")
+
+mga_utility_contributions_leadership_summarized <- mga_utility_contributions_leadership %>% 
+  group_by(accepted_contributions) %>% 
+  summarise(count = n())
+
+mga_utility_contributions_leadership_summarized <- mga_utility_contributions_leadership_summarized %>%
+  mutate(percent = count/sum(count)*100)
+```
+
+
+```{r}
+committee_members <- read.csv("data/committee_members.csv") %>% 
+  clean_names() 
+
+committee_members_summarized <- committee_members %>%  
+  group_by(accepted_contributions) %>% 
+  summarise(count = n())
+
+committee_members_summarized <- committee_members_summarized %>% 
+  mutate(percent = count/sum(count)*100)
+```
+
+
+```{r}
+committee_members_by_contributions <- committee_members %>% 
+  group_by(committee, accepted_contributions) %>% 
+  summarise(count = n())
+
+committee_members_by_contributions <- committee_members_by_contributions %>% 
+  mutate(percent = count/sum(count)*100)
+
+write.csv(committee_members_by_contributions, file = "data/committee_members_by_contributions.csv", row.names = TRUE)
+```
+
